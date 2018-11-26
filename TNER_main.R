@@ -176,6 +176,7 @@ polish.pred.3nt=function(bgrd.ave=shr.bg.ave,           #average mutation rate d
   d1= pileup.data[,c(rbind(s,tolower(s)))] 
   d1.2 = sapply(s,function(x) rowSums(d1[,toupper(names(d1))==x]))  #sum mutation count
   if (polish.method=="Binomial") d2=d1.2/pileup.data$DEPTH else d2=d1.2 # calculate mutation rate for the testing sample
+  d2[pileup.data$DEPTH == 0,] = 0  # set mutation rate of 0-depth positions to 0 (otherwise NA which isn't tolerated downstream)
   
   #calculate the average count using input rate and depth 
   ave.read.count=bgrd.ave*bgrd.depth 
