@@ -141,6 +141,8 @@ polish.pred.3nt=function(bgrd.ave=shr.bg.ave,           #average mutation rate d
     pileup.data=rbind(pileup.data,miss.nt)
     pileup.data=pileup.data[match(rownames(bgrd.ave),rownames(pileup.data)),]
   }
+  # set depth of 0-depth positions to 1 (if not missing from input), to avoid dividing by 0 and creating non-tolerated NAs downstream
+  pileup.data$DEPTH[pileup.data$DEPTH == 0] = 1
   
     out.pileup=pileup.data #save a copy for output
   #below is not a critical step. It changes the column name of forward strand to cap letter: A+ to A; and 
@@ -176,8 +178,7 @@ polish.pred.3nt=function(bgrd.ave=shr.bg.ave,           #average mutation rate d
   d1= pileup.data[,c(rbind(s,tolower(s)))] 
   d1.2 = sapply(s,function(x) rowSums(d1[,toupper(names(d1))==x]))  #sum mutation count
   if (polish.method=="Binomial") d2=d1.2/pileup.data$DEPTH else d2=d1.2 # calculate mutation rate for the testing sample
-  d2[pileup.data$DEPTH == 0,] = 0  # set mutation rate of 0-depth positions to 0 (otherwise NA which isn't tolerated downstream)
-  
+
   #calculate the average count using input rate and depth 
   ave.read.count=bgrd.ave*bgrd.depth 
   
