@@ -36,19 +36,30 @@
 # 
 #################################################################
 
-args = commandArgs(trailingOnly=TRUE)  # 1-3 arguments from input
+library(optparse)
 
-work.dir="."  #working directory is where the input and output file stored
+#### parsing the command line ####
 
-# Some optional parameters to tune
-input.alpha  = 0.01    #Polish strength parameter
-#input.filter = FALSE   #turn on the filter to filter out those bases with abnormal data
+option_list = list(
+  make_option(c("-o", "--output"), action = "store", type = "character", default = NULL,
+              help = "Output polished freq file or list of output freq files in csv format [INPUTFREQFILE.clean.txt]"),
+  make_option(c("-n", "--noise"), action = "store", type = "character", default = NULL,
+              help = "Output noise file or list of output noise files in csv format [INPUTFREQFILE.noise.txt]")
+)
+op = OptionParser(option_list=option_list, usage = "usage: %prog [options] inputFreqFile [backgroundRateFile] [backgroundDepthFile]",
+                  description = "
+inputFreqFile: Input freq file or list of input freq files in csv format, required
+backgroundRateFile: Background average error rate csv file [hs_ave_bg_error.csv],
+backgroundDepthFile: Background average depth csv file [hs_depth.csv]")
+cmdl = parse_args(op, positional_arguments = c(0,3))
+opt = cmdl$options
+args = cmdl$args
 
-# processing the input
-#####################
+
 tnt.rate.file=tnt.depth.file=NULL
 if (length(args)==0) {
-  stop("Usage: Rscript TNER_main.R TNER_example_input_file.txt hs_ave_bg_error.csv hs_depth.csv.", call.=FALSE)
+  print_help(op)
+  stop("No input freq file provided")
 } else if (length(args)>1) {
   # default output file
   tnt.rate.file=args[2]  # Average bkgrd rate file
@@ -67,7 +78,36 @@ if (is.null(tnt.depth.file)) tnt.depth.file="hs_depth.csv" else  # provide the d
   tnt.depth.file=NULL
   if (tnt.depth<1) stop("coverage depth input value invalid: positive integer)")}
 
-# end of processing input
+#the output files can be single files (.txt, .freq, etc) or lists of files saved in csv format
+output.file = opt$output
+if (length(grep('csv',output.file))>0) {
+  output.pileup.file=unlist(read.csv(output.file,header=F,as.is=T)) 
+} else if (is.null(output.file)) {
+  output.pileup.file=rep(NULL, length(input.pileup.file))
+} else {
+  output.pileup.file=output.file
+}
+noise.file = opt$noise
+if (length(grep('csv',noise.file))>0) {
+  noise.pileup.file=unlist(read.csv(noise.file,header=F,as.is=T)) 
+} else if (is.null(noise.file)) {
+  noise.pileup.file=rep(NULL, length(input.pileup.file))
+} else {
+  noise.pileup.file=noise.file
+}
+
+# Check that number of input files agree with number of output files
+if (length(input.pileup.file) != length(output.pileup.file) | length(input.pileup.file) != length(noise.final.file)) {
+  stop("Number of provided input file names has to be the same as number of provided output file names and noise file names repsectively")
+}
+
+#### END parsing the command line ####
+
+
+# Some optional parameters to tune
+input.alpha  = 0.01    #Polish strength parameter
+#input.filter = FALSE   #turn on the filter to filter out those bases with abnormal data
+
 
 
 s=c("A","C","T","G") # four nucleotide letter
@@ -124,7 +164,8 @@ polish.pred.3nt=function(bgrd.ave=shr.bg.ave,           #average mutation rate d
                          alpha=input.alpha,             #alpha = significance level, control polishing strength
                          filter=FALSE,           #filter out those bases based on filtering criteria
                          polyclone=TRUE,                # Output polyclone results, if FALSE, then only the base with the highest mutation rate is outputted
-                         out.dir=NULL)                  #output directory. If null, polished data will be outputted to the same directory of input data    
+                         out.clean=NULL,                  #output polished file. If null, polished data will be outputted to the directory of the input data    
+                         out.noise=NULL)                  #output noise file (what's been polished away). If null, noise data will be outputted to the directory of the input data    
 { cat(paste("Polishing",pred.sample,"\n"))
   pileup.data=read.table(file=pred.sample,header=T,check.names = F,as.is=T) #read in the data
   rownames(pileup.data)=paste(pileup.data$CHR,pileup.data$POSITION,sep=":")
@@ -211,11 +252,10 @@ polish.pred.3nt=function(bgrd.ave=shr.bg.ave,           #average mutation rate d
   out.pileup$DEPTH=apply(out.pileup[,c(5:6,nt.column.loc)],1,sum) #re-calculate the depth after polish so they add up
   
   #handling output file name and directory
-  out.file.name=input.file
-  out.file.name1=paste(out.file.name,".clean.txt",sep="")
-  out.file.name2=paste(out.file.name,".noise.txt",sep="")
-  write.table(out.pileup,file=out.file.name1,sep="\t",quote=F,row.names=F)
-  write.table(polish.noise,file=out.file.name2,sep="\t",quote=F,row.names=F)
+  if (is.null(out.clean)) out.clean=paste(input.file,".clean.txt",sep="")
+  if (is.null(out.noise)) out.noise=paste(input.file,".noise.txt",sep="")
+  write.table(out.pileup,file=out.clean,sep="\t",quote=F,row.names=F)
+  write.table(polish.noise,file=out.noise,sep="\t",quote=F,row.names=F)
   return(pred)
 }
 
@@ -230,7 +270,8 @@ for (i in 1:n.sample) pred3.all[,i]=polish.pred.3nt(bgrd.ave = shr.bg.ave,
                                                     pred.sample = input.pileup.file[i],
                                                     alpha=input.alpha,
                                                     polyclone=TRUE,
-                                                    out.dir=work.dir)
+                                                    out.clean = output.pileup.file[i],
+                                                    out.noise = noise.final.file[i])
 
 # The resulted data pred3.all is an indicator matrix for each position(row) and sample (column)
 # 1=mutation, 0= no mutation

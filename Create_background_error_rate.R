@@ -36,11 +36,29 @@
 # also a csv file named "hs_depth.csv": provides read depth data for all covered positions.
 ###########################################################################
 
+library(optparse)
+
+#### parsing the command line ####
+
+option_list = list(
+  make_option(c("-i", "--inputdir"), action = "store", type = "character", default = "./healthy_subjects",
+              help = "Input data directory of healthy subjects freq files, [%default]"),
+  make_option(c("-p", "--pattern"), action = "store", type = "character", default = "freq$",
+              help = "Pattern of healthy subjects freq file names to search for in INPUTDIR, [%default"),
+  make_option(c("-b", "--background"), action = "store", type = "character", default = "hs_ave_bg_error.csv",
+              help = "Output background average error rate csv file [%default]"),
+  make_option(c("-d", "--depth"), action = "store", type = "character", default = "hs_depth.csv",
+              help = "Output background average depth csv file [%default]")
+)
+opt = parse_args(OptionParser(option_list=option_list))
+
+#### END parsing the command line ####
+
 # data directory
 setwd(".")  #set work directory
-data.dir = "./healthy_subjects"  #Assume the healthy_subjects folder in under the working dir
+data.dir = opt$inputdir  
 
-hs.files=list.files(path=data.dir,pattern="freq$") # list all healthy subject pileup data files; require at least two or more normal samples
+hs.files=list.files(path=data.dir, pattern=opt$pattern, full.names=TRUE, recursive=TRUE) # list all healthy subject pileup data files
 
 s=c("A","C","T","G") # four nucleotide letter
 
@@ -75,5 +93,5 @@ rownames(hs.depth)=rownames(hs.bkg.ave)
 colnames(hs.depth)=hs.files
 #make sure the data are sorted by CHR and POS
 
-write.csv(hs.bkg.ave,file="hs_ave_bg_error.csv") #output healthy subject average background error rate data
-write.csv(hs.depth,file="hs_depth.csv")     #output healthy subject depth data
+write.csv(hs.bkg.ave,file=opt$background) #output healthy subject average background error rate data
+write.csv(hs.depth,file=opt$depth)     #output healthy subject depth data
